@@ -1062,7 +1062,7 @@ def _compile(
 
             def convert_sets_to_strings(d: Dict[str, Any]) -> Dict[str, Any]:
                 return {
-                    key: str(value) if isinstance(value, set) else value
+                    key: list(value) if isinstance(value, set) else value
                     for key, value in d.items()
                 }
 
