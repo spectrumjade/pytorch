@@ -3032,6 +3032,7 @@ class AOTInductorTestsTemplate:
                 def forward(self, x0, x1, x2, x4, x5, x6, x7, x8, x9):
                     return (x0, x1, x2, x4, x5, x6, x7, x8, x9)
 
+        inputs = []
         dtypes = [torch.float16,
                   torch.float32,
                   torch.float64,
