@@ -22,6 +22,7 @@
 #include <c10/util/irange.h>
 #include <c10/util/thread_name.h>
 #include <torch/csrc/cuda/nccl.h>
+#include <torch/csrc/distributed/c10d/Functional.hpp>
 #include <torch/csrc/distributed/c10d/NCCLUtils.hpp>
 #include <torch/csrc/distributed/c10d/NanCheck.hpp>
 #include <torch/csrc/distributed/c10d/ParamCommsUtils.hpp>
@@ -2778,6 +2779,11 @@ c10::intrusive_ptr<Work> ProcessGroupNCCL::collective(
 
   // Store references to outputs to be used by WorkNCCL::result and operator<<.
   work->outputs_ = std::make_shared<std::vector<at::Tensor>>(outputs);
+  // Associate output tensors with the work, so that `.wait_tensor(output)` will
+  // invoke the correct `work.wait()`.
+  for (const auto& output : outputs) {
+    c10d::register_work(output, work);
+  }
 
   if (avoidRecordStreams) {
     work->stashed_for_allocator_safety_ =
@@ -2968,6 +2974,11 @@ c10::intrusive_ptr<Work> ProcessGroupNCCL::collectiveCoalesced(
 
   // Store references to outputs to be used by WorkNCCL::result and operator<<.
   work->outputs_ = std::make_shared<std::vector<at::Tensor>>(outputs);
+  // Associate output tensors with the work, so that `.wait_tensor(output)` will
+  // invoke the correct `work.wait()`.
+  for (const auto& output : outputs) {
+    c10d::register_work(output, work);
+  }
 
   if (avoidRecordStreams) {
     work->stashed_for_allocator_safety_ =
