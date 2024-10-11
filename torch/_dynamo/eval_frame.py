@@ -114,6 +114,41 @@ def _maybe_set_eval_frame(callback: DynamoCallback):
         return set_eval_frame(callback)
 
 
+_stance = threading.local()
+_stance.value = "default"
+
+
+def _set_stance(stance: str):
+    prior = _stance.value
+    _stance.value = stance
+    return prior
+
+
+_set_stance._dynamo_forbidden = True  # type: ignore[attr-defined]
+
+
+def _callback_from_stance(callback):
+    if _stance.value == "default":
+        # TODO force_backend here
+        return callback
+    elif _stance.value == "force_eager":
+        # disable
+        return None
+    elif _stance.value == "eager_on_recompile":
+        # run mode
+        return False
+    elif _stance.value == "fail_on_recompile":
+
+        def fail_callback(*args, **kwargs):
+            raise RuntimeError(
+                "Dected recompile when torch.compile stance is 'fail_on_recompile'"
+            )
+
+        return fail_callback
+    else:
+        raise RuntimeError(f"invalid torch.compile stance '{_stance.value}'")
+
+
 def _reset_guarded_backend_cache():
     global cached_backends
     for backend in cached_backends.values():
@@ -471,7 +506,7 @@ class _TorchDynamoContext:
                 )
 
             cleanups = [enter() for enter in self.enter_exit_hooks]
-            prior = _maybe_set_eval_frame(callback)
+            prior = _maybe_set_eval_frame(_callback_from_stance(callback))
 
             # Ensure that if an assertion occurs after graph pushes
             # something onto the DynamicLayerStack then we pop it off (the
@@ -645,11 +680,9 @@ class DisableContext(_TorchDynamoContext):
 
         assert callable(fn)
 
-        callback = self.callback
-
         @functools.wraps(fn)
         def _fn(*args, **kwargs):
-            prior = _maybe_set_eval_frame(callback)
+            prior = _maybe_set_eval_frame(_callback_from_stance(self.callback))
             try:
                 return fn(*args, **kwargs)
             finally:
